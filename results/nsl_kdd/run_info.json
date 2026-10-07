@@ -1,0 +1,87 @@
+{
+  "config": {
+    "dataset": {
+      "name": "nsl_kdd",
+      "download": true
+    },
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "eval_samples": null,
+    "eps": [
+      0.01,
+      0.02,
+      0.05,
+      0.1,
+      0.2
+    ],
+    "threat_models": {
+      "unconstrained": {
+        "mutable": null,
+        "repair": false
+      },
+      "feasible": {
+        "mutable": [
+          "duration",
+          "src_bytes",
+          "dst_bytes",
+          "count",
+          "srv_count"
+        ],
+        "directions": {
+          "duration": 1,
+          "src_bytes": 1,
+          "dst_bytes": 1,
+          "count": 1,
+          "srv_count": 1
+        },
+        "repair": true
+      }
+    },
+    "attacks": {
+      "fgsm": {},
+      "pgd": {
+        "steps": 50,
+        "restarts": 2
+      },
+      "cw": {
+        "steps": 50,
+        "search_steps": 3
+      },
+      "random": {
+        "queries": 200
+      }
+    },
+    "train": {
+      "hidden": [
+        128,
+        64
+      ],
+      "epochs": 15,
+      "lr": 0.001,
+      "batch_size": 256,
+      "val_fraction": 0.1
+    },
+    "adversarial_training": {
+      "threat_model": "unconstrained",
+      "eps": 0.05,
+      "steps": 7,
+      "adv_weight": 0.5
+    },
+    "transfer": true
+  },
+  "robustsec": "1.0.0",
+  "python": "3.13.16",
+  "versions": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "torch": "2.14.1+cu130",
+    "scikit_learn": "1.9.1"
+  },
+  "platform": "Linux-6.18.44-fc-v77-x86_64-with-glibc2.39",
+  "wall_time_s": 4320.3
+}
