@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use RobustSec, please cite it as below."
+title: "RobustSec: feasibility-aware robustness evaluation of tabular intrusion detectors"
+version: 1.0.0
+date-released: 2026-10-07
+license: MIT
+repository-code: "https://github.com/aliqah0a/robustsec"
+authors:
+  - family-names: AlQahtani
+    given-names: "Ali Abdullah S."
+    email: AlQahtani.aasa@gmail.com
+    affiliation: "Department of Software Engineering, College of Computer & Information Science, Prince Sultan University, Riyadh, Saudi Arabia"
+keywords:
+  - adversarial machine learning
+  - network intrusion detection
+  - robustness evaluation
+  - tabular data

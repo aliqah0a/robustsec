@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robustsec"
+version = "1.0.0"
+description = "Robustness evaluation of tabular intrusion detectors under feasibility-aware threat models"
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+authors = [{name = "Ali Abdullah S. AlQahtani", email = "AlQahtani.aasa@gmail.com"}]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.23",
+  "pandas>=1.5",
+  "scikit-learn>=1.2",
+  "torch>=2.0",
+  "matplotlib>=3.6",
+]
+keywords = ["adversarial machine learning", "intrusion detection", "robustness", "tabular data"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Security",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+robustsec = "robustsec.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/aliqah0a/robustsec"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

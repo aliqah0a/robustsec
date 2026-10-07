@@ -1,0 +1,23 @@
+{
+  "title": "RobustSec: feasibility-aware robustness evaluation of tabular intrusion detectors",
+  "upload_type": "software",
+  "description": "<p>RobustSec is a Python package for evaluating the adversarial robustness of tabular network intrusion detection systems (NIDS). It compares an unconstrained threat model with a feasibility-aware threat model declared in a feature schema, and provides FGSM, PGD, Carlini-Wagner, label-only and transfer attacks, PGD adversarial training, robustness metrics with Wilson confidence intervals, and a reproducible JSON-driven benchmark runner with NSL-KDD reference results.</p>",
+  "creators": [
+    {
+      "name": "AlQahtani, Ali Abdullah S.",
+      "affiliation": "Department of Software Engineering, College of Computer & Information Science, Prince Sultan University, Riyadh, Saudi Arabia"
+    }
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "version": "1.0.0",
+  "publication_date": "2026-10-07",
+  "language": "eng",
+  "keywords": [
+    "adversarial machine learning",
+    "network intrusion detection",
+    "robustness evaluation",
+    "tabular data",
+    "Python"
+  ]
+}
