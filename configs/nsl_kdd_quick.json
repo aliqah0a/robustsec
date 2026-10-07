@@ -1,0 +1,23 @@
+{
+  "dataset": {"name": "nsl_kdd", "download": true},
+  "seeds": [0],
+  "eval_samples": 2000,
+  "eps": [0.05, 0.1],
+  "threat_models": {
+    "unconstrained": {"mutable": null, "repair": false},
+    "feasible": {
+      "mutable": ["duration", "src_bytes", "dst_bytes", "count", "srv_count"],
+      "directions": {"duration": 1, "src_bytes": 1, "dst_bytes": 1, "count": 1, "srv_count": 1},
+      "repair": true
+    }
+  },
+  "attacks": {
+    "fgsm": {},
+    "pgd": {"steps": 20, "restarts": 1},
+    "cw": {"steps": 30, "search_steps": 2},
+    "random": {"queries": 100}
+  },
+  "train": {"epochs": 5},
+  "adversarial_training": {"threat_model": "unconstrained", "eps": 0.05, "steps": 5, "adv_weight": 0.5},
+  "transfer": true
+}
