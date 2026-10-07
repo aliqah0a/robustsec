@@ -4,6 +4,7 @@ title: "RobustSec: feasibility-aware robustness evaluation of tabular intrusion 
 version: 1.0.0
 date-released: 2026-10-07
 license: MIT
+doi: 10.5281/zenodo.23216058
 repository-code: "https://github.com/aliqah0a/robustsec"
 authors:
   - family-names: AlQahtani
@@ -15,3 +16,10 @@ keywords:
   - network intrusion detection
   - robustness evaluation
   - tabular data
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23216057
+    description: "Concept DOI (all versions)"
+  - type: doi
+    value: 10.5281/zenodo.23216058
+    description: "DOI of version 1.0.0"

@@ -1,6 +1,7 @@
 # RobustSec
 
 [![tests](https://github.com/aliqah0a/robustsec/actions/workflows/ci.yml/badge.svg)](https://github.com/aliqah0a/robustsec/actions/workflows/ci.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23216057.svg)](https://doi.org/10.5281/zenodo.23216057)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.txt)
 
 RobustSec is a Python package for evaluating the adversarial robustness of
@@ -160,7 +161,10 @@ docs/            user guide
 
 ## Citation
 
-See `CITATION.cff`. A BibTeX entry will be added when the paper is published.
+See `CITATION.cff`. The software is archived on Zenodo: version 1.0.0 has the DOI
+[10.5281/zenodo.23216058](https://doi.org/10.5281/zenodo.23216058), and
+[10.5281/zenodo.23216057](https://doi.org/10.5281/zenodo.23216057) always points to the
+latest version. A BibTeX entry for the paper will be added when it is published.
 
 ## License
 
