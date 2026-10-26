@@ -3,9 +3,10 @@
 Every attack works in the encoded space produced by
 :class:`robustsec.preprocessing.TabularEncoder`. A :class:`ThreatModel`
 decides which encoded columns may move, in which direction, and inside
-which box. When the threat model carries a repair function, each final
-adversarial example (and every query of the decision-based attack) is
-mapped back to a valid raw input before it is scored.
+which box. When the threat model carries a repair function, every
+candidate is mapped back to a valid raw input before it is scored, and
+attacks keep only candidates whose success holds after repair. Gradient
+steps are taken on the continuous relaxation; selection uses repaired points.
 """
 from __future__ import annotations
 
@@ -27,12 +28,15 @@ class ThreatModel:
     mask : 1 for columns the attacker may change, 0 otherwise.
     direction : +1 increase only, -1 decrease only, 0 both.
     lower, upper : box bounds of the encoded space (default [0, 1]).
-    repair : optional ``f(X_adv, X_orig) -> X_feasible`` applied to final
-        samples, for example :meth:`TabularEncoder.repair`.
+    repair : optional ``f(X_adv, X_orig, eps) -> X_feasible`` applied to
+        candidates, for example :meth:`TabularEncoder.repair`.
+    encoder : the encoder the threat model was built from, if any. The
+        greedy search uses it to enumerate valid raw values.
     """
 
     def __init__(self, n_features: int, mask=None, direction=None, lower=None,
-                 upper=None, repair: Optional[Callable] = None):
+                 upper=None, repair: Optional[Callable] = None, encoder=None,
+                 schema=None, budget: str = "strict"):
         ones = np.ones(n_features, dtype=np.float32)
         self.mask = np.asarray(ones if mask is None else mask, dtype=np.float32)
         self.direction = np.asarray(0 * ones if direction is None else direction,
@@ -40,6 +44,7 @@ class ThreatModel:
         self.lower = np.asarray(0 * ones if lower is None else lower, dtype=np.float32)
         self.upper = np.asarray(ones if upper is None else upper, dtype=np.float32)
         self.repair = repair
+        self.encoder, self.schema, self.budget = encoder, schema, budget
         self._cache = {}
 
     @classmethod
@@ -48,11 +53,18 @@ class ThreatModel:
         return cls(n_features)
 
     @classmethod
-    def from_encoder(cls, encoder, schema=None, repair: bool = True) -> "ThreatModel":
-        """Build a threat model from an encoder and a (threat-model) schema."""
+    def from_encoder(cls, encoder, schema=None, repair: bool = True,
+                     budget: str = "strict") -> "ThreatModel":
+        """Build a threat model from an encoder and a (threat-model) schema.
+
+        ``budget="strict"`` makes repair keep every candidate inside the
+        eps-ball; ``"nominal"`` allows rounding to exceed it (v1.0).
+        """
         v = encoder.constraint_vectors(schema)
-        fn = (lambda Xa, Xo: encoder.repair(Xa, Xo, schema)) if repair else None
-        return cls(len(v["mask"]), v["mask"], v["direction"], v["lower"], v["upper"], fn)
+        fn = ((lambda Xa, Xo, eps=None: encoder.repair(Xa, Xo, schema, eps=eps, budget=budget))
+              if repair else None)
+        return cls(len(v["mask"]), v["mask"], v["direction"], v["lower"], v["upper"], fn,
+                   encoder=encoder, schema=schema or encoder.schema, budget=budget)
 
     def _t(self, device):
         if device not in self._cache:
@@ -70,10 +82,20 @@ class ThreatModel:
         hi = torch.maximum(upper, x0)
         return torch.max(torch.min(x0 + delta, hi), lo)
 
-    def finalize(self, X_adv: np.ndarray, X_orig: np.ndarray) -> np.ndarray:
+    def finalize(self, X_adv: np.ndarray, X_orig: np.ndarray,
+                 eps: Optional[float] = None) -> np.ndarray:
+        """Repair candidates (no-op without a repair function)."""
         if self.repair is None:
-            return X_adv.astype(np.float32)
-        return self.repair(X_adv, X_orig)
+            return np.asarray(X_adv, dtype=np.float32)
+        return self.repair(X_adv, X_orig, eps)
+
+    def finalize_tensor(self, x: torch.Tensor, x0: torch.Tensor,
+                        eps: Optional[float] = None) -> torch.Tensor:
+        """Tensor version of :meth:`finalize` (returns ``x`` without repair)."""
+        if self.repair is None:
+            return x
+        out = self.repair(x.detach().cpu().numpy(), x0.detach().cpu().numpy(), eps)
+        return torch.as_tensor(out, device=x.device)
 
 
 class Attack:
@@ -103,7 +125,7 @@ class Attack:
         for i in range(0, len(X), self.batch_size):
             xb, yb = X[i:i + self.batch_size], y[i:i + self.batch_size]
             adv = self._attack_batch(clf, xb, yb, tm, gen)
-            out.append(tm.finalize(adv, xb))
+            out.append(tm.finalize(adv, xb, self.eps))
         return np.concatenate(out) if out else X.copy()
 
     def _attack_batch(self, clf, X, y, tm, gen):  # pragma: no cover
@@ -135,38 +157,57 @@ class FGSM(Attack):
 class PGD(Attack):
     """Projected gradient descent on the cross-entropy loss (Madry et al., 2018).
 
-    Starts from a uniform random point in the feasible eps-ball, uses
-    ``restarts`` independent runs, and keeps, per sample, the iterate that is
-    misclassified (if any) or that reached the highest loss.
+    Starts from a uniform random point in the feasible eps-ball (or from the
+    clean point with ``random_start=False``) and runs ``restarts``
+    independent runs. After every step, including the start, the iterate is
+    repaired and scored. Per sample, the attack keeps the repaired candidate
+    that is misclassified (if any) or that reached the highest loss, across
+    all steps and restarts. Steps are taken on the unrepaired iterate.
     """
 
     name = "PGD"
 
     def __init__(self, eps, steps: int = 50, alpha: Optional[float] = None,
-                 restarts: int = 1, **kw):
+                 restarts: int = 1, random_start: bool = True, **kw):
         super().__init__(eps, **kw)
         self.steps = steps
         self.alpha = alpha if alpha is not None else 2.5 * self.eps / max(steps, 1)
         self.restarts = restarts
+        self.random_start = random_start
 
     def run(self, clf, x0: torch.Tensor, yt: torch.Tensor, tm: ThreatModel,
-            gen: Optional[torch.Generator] = None) -> torch.Tensor:
-        """Tensor-level PGD, also used inside adversarial training."""
+            gen: Optional[torch.Generator] = None, repair: bool = True) -> torch.Tensor:
+        """Tensor-level PGD, also used inside adversarial training.
+
+        ``repair=False`` scores the raw iterates of the continuous
+        relaxation instead of their repaired versions.
+        """
         best = x0.clone()
         best_score = torch.full((len(x0),), -float("inf"), device=x0.device)
-        for _ in range(self.restarts):
-            noise = torch.rand(x0.shape, generator=gen).to(x0.device) * 2 - 1
-            x = tm.project(x0 + self.eps * noise, x0, self.eps)
-            for _ in range(self.steps):
-                g, _, _ = _grad(clf, x, yt)
-                x = tm.project(x + self.alpha * g.sign(), x0, self.eps)
+        use_repair = repair and tm.repair is not None
+
+        def consider(x):
+            nonlocal best, best_score
+            cand = tm.finalize_tensor(x, x0, self.eps) if use_repair else x
             with torch.no_grad():
-                logits = clf.logits(x)
+                logits = clf.logits(cand)
                 loss = F.cross_entropy(logits, yt, reduction="none")
                 score = loss + 1e6 * (logits.argmax(1) != yt).float()
                 better = score > best_score
-                best[better] = x[better]
+                best[better] = cand[better]
                 best_score = torch.where(better, score, best_score)
+
+        for _ in range(self.restarts):
+            if self.random_start:
+                noise = torch.rand(x0.shape, generator=gen).to(x0.device) * 2 - 1
+                x = tm.project(x0 + self.eps * noise, x0, self.eps)
+            else:
+                x = x0.clone()
+            consider(x)
+            for _ in range(self.steps):
+                g, _, _ = _grad(clf, x, yt)
+                x = tm.project(x + self.alpha * g.sign(), x0, self.eps)
+                consider(x)
         return best.detach()
 
     def _attack_batch(self, clf, X, y, tm, gen):
@@ -179,9 +220,11 @@ class CarliniWagnerL2(Attack):
 
     Minimises ``||delta||_2^2 + c * max(z_y - max_{j != y} z_j, -kappa)``
     with Adam, projecting onto the feasible eps-ball after every step. A
-    binary search adapts ``c`` per sample. The attack returns, for each
-    sample, the successful perturbation with the smallest L2 norm, or the
-    clean input when no step succeeds.
+    binary search adapts ``c`` per sample. After every step the iterate is
+    repaired; success and the L2 norm are measured on the repaired point.
+    The attack returns, for each sample, the successful repaired
+    perturbation with the smallest L2 norm, or the clean input when no
+    repaired candidate succeeds.
     """
 
     name = "CW-L2"
@@ -220,12 +263,15 @@ class CarliniWagnerL2(Attack):
                 loss.backward()
                 opt.step()
                 with torch.no_grad():
-                    succ = z.argmax(1) != yt
-                    improve = succ & (l2 < best_l2)
-                    best[improve] = x.detach()[improve]
-                    best_l2 = torch.where(improve, l2, best_l2)
-                    found |= succ
                     delta.data = tm.project(x0 + delta.data, x0, self.eps) - x0
+                    cand = tm.finalize_tensor(x.detach(), x0, self.eps)
+                    zc = z.detach() if tm.repair is None else clf.logits(cand)
+                    succ = zc.argmax(1) != yt
+                    l2c = ((cand - x0) ** 2).sum(1)
+                    improve = succ & (l2c < best_l2)
+                    best[improve] = cand[improve]
+                    best_l2 = torch.where(improve, l2c, best_l2)
+                    found |= succ
             with torch.no_grad():   # binary search on c
                 hi_c = torch.where(found, torch.minimum(hi_c, c), hi_c)
                 lo_c = torch.where(found, lo_c, torch.maximum(lo_c, c))
@@ -267,6 +313,83 @@ class RandomSearch(Attack):
         return adv
 
 
+class GreedySearch(Attack):
+    """Score-based coordinate search on the valid, repaired input grid.
+
+    The attack needs only class probabilities. In each round it tries, for
+    every attacker-controlled feature, ``grid`` values spread over the
+    interval that the threat model allows for that feature (budget,
+    direction and domain), repairs each candidate, and applies the single
+    change that raises the loss most. It stops for a sample once that
+    sample is misclassified, after ``rounds`` rounds, or when no change
+    raises the loss. Because every query is a valid repaired record, the
+    search does not depend on gradients or on the continuous relaxation,
+    which makes it a check on gradient masking caused by rounding.
+    """
+
+    name = "Greedy"
+    requires_gradients = False
+
+    def __init__(self, eps, rounds: int = 10, grid: int = 4, chunk: int = 256, **kw):
+        super().__init__(eps, **kw)
+        self.rounds, self.grid, self.chunk = rounds, grid, chunk
+
+    def _candidate_values(self, tm, X0):
+        """Per encoded column: (n, grid) encoded target values, or None."""
+        mask, direction = tm.mask, tm.direction
+        lo = np.maximum(np.minimum(tm.lower, X0), X0 - self.eps)
+        hi = np.minimum(np.maximum(tm.upper, X0), X0 + self.eps)
+        lo = np.where(direction > 0, X0, lo)
+        hi = np.where(direction < 0, X0, hi)
+        t = np.linspace(0.0, 1.0, self.grid)
+        cols = [j for j in range(X0.shape[1]) if mask[j] > 0]
+        return cols, {j: lo[:, j, None] + (hi[:, j] - lo[:, j])[:, None] * t for j in cols}
+
+    def _attack_batch(self, clf, X, y, tm, gen):
+        out = X.copy()
+        for s0 in range(0, len(X), self.chunk):
+            out[s0:s0 + self.chunk] = self._chunk(clf, X[s0:s0 + self.chunk],
+                                                  y[s0:s0 + self.chunk], tm)
+        return out
+
+    def _loss(self, clf, Xc, yc):
+        p = np.clip(clf.predict_proba(Xc), 1e-12, 1.0)
+        return -np.log(p[np.arange(len(yc)), yc]), p.argmax(1)
+
+    def _chunk(self, clf, X0, y, tm):
+        n, d = X0.shape
+        cur = X0.copy()
+        cur_loss, pred = self._loss(clf, cur, y)
+        active = pred == y
+        cols, values = self._candidate_values(tm, X0)
+        if not cols:
+            return cur
+        for _ in range(self.rounds):
+            idx = np.flatnonzero(active)
+            if not len(idx):
+                break
+            k = len(cols) * self.grid
+            cand = np.repeat(cur[idx], k, axis=0).reshape(len(idx), k, d)
+            for a, j in enumerate(cols):
+                cand[:, a * self.grid:(a + 1) * self.grid, j] = values[j][idx]
+            flat = cand.reshape(-1, d)
+            base = np.repeat(X0[idx], k, axis=0)
+            flat = tm.finalize(flat, base, self.eps)
+            loss, p = self._loss(clf, flat, np.repeat(y[idx], k))
+            loss = loss.reshape(len(idx), k)
+            mis = (p != np.repeat(y[idx], k)).reshape(len(idx), k)
+            score = loss + 1e6 * mis
+            b = score.argmax(1)
+            gain = score[np.arange(len(idx)), b] > cur_loss[idx] + 1e-12
+            take = idx[gain]
+            cur[take] = flat.reshape(len(idx), k, d)[gain, b[gain]]
+            cur_loss[take] = loss[gain, b[gain]]
+            done = mis[np.arange(len(idx)), b] & gain
+            active[idx[done]] = False
+            active[idx[~gain]] = False
+        return cur
+
+
 class TransferAttack(Attack):
     """Craft examples on a surrogate model and evaluate them on the target.
 
@@ -286,7 +409,8 @@ class TransferAttack(Attack):
         return self.base.generate(self.surrogate, X, y)
 
 
-ATTACKS = {"fgsm": FGSM, "pgd": PGD, "cw": CarliniWagnerL2, "random": RandomSearch}
+ATTACKS = {"fgsm": FGSM, "pgd": PGD, "cw": CarliniWagnerL2, "random": RandomSearch,
+           "greedy": GreedySearch}
 
 
 def make_attack(name: str, eps: float, threat_model: Optional[ThreatModel] = None,

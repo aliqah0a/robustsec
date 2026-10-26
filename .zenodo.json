@@ -1,7 +1,7 @@
 {
-  "title": "RobustSec: feasibility-aware robustness evaluation of tabular intrusion detectors",
+  "title": "RobustSec: robustness evaluation of tabular network intrusion detectors under schema-constrained threat models",
   "upload_type": "software",
-  "description": "<p>RobustSec is a Python package for evaluating the adversarial robustness of tabular network intrusion detection systems (NIDS). It compares an unconstrained threat model with a feasibility-aware threat model declared in a feature schema, and provides FGSM, PGD, Carlini-Wagner, label-only and transfer attacks, PGD adversarial training, robustness metrics with Wilson confidence intervals, and a reproducible JSON-driven benchmark runner with NSL-KDD reference results.</p>",
+  "description": "<p>RobustSec is a Python package for evaluating the adversarial robustness of tabular network intrusion detection systems (NIDS). A feature schema states which features an attacker controls, in which direction, and how declared derived features follow them. The same attacks then run under an unconstrained and a schema-constrained threat model, and every scored candidate is repaired to a schema-valid record inside the nominal budget. The package provides FGSM, PGD, Carlini-Wagner L2, label-only random search, score-based greedy search and transfer attacks, PGD adversarial training on repaired or relaxed examples, Wilson and paired confidence intervals, and a reproducible JSON-driven benchmark runner with NSL-KDD and UNSW-NB15 reference results.</p>",
   "creators": [
     {
       "name": "AlQahtani, Ali Abdullah S.",
@@ -10,8 +10,8 @@
   ],
   "license": "MIT",
   "access_right": "open",
-  "version": "1.0.0",
-  "publication_date": "2026-10-07",
+  "version": "1.1.0",
+  "publication_date": "2026-10-26",
   "language": "eng",
   "keywords": [
     "adversarial machine learning",

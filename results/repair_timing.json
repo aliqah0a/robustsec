@@ -1,0 +1,26 @@
+{
+  "constrained": {
+    "rows": 100000,
+    "median_s": 0.1705,
+    "rows_per_s": 586665
+  },
+  "constrained_dilution": {
+    "rows": 100000,
+    "median_s": 0.1943,
+    "rows_per_s": 514546
+  },
+  "all_mutable": {
+    "rows": 100000,
+    "median_s": 0.372,
+    "rows_per_s": 268801
+  },
+  "hardware": {
+    "platform": "Linux-6.18.44-fc-v153-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "logical_cores": 2,
+    "ram_gb": 7.8,
+    "gpu": null,
+    "torch_threads": 2
+  }
+}

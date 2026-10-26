@@ -24,7 +24,7 @@
         "mutable": null,
         "repair": false
       },
-      "feasible": {
+      "constrained": {
         "mutable": [
           "duration",
           "src_bytes",
@@ -39,7 +39,8 @@
           "count": 1,
           "srv_count": 1
         },
-        "repair": true
+        "repair": true,
+        "budget": "strict"
       }
     },
     "attacks": {
@@ -54,6 +55,10 @@
       },
       "random": {
         "queries": 200
+      },
+      "greedy": {
+        "rounds": 10,
+        "grid": 4
       }
     },
     "train": {
@@ -67,14 +72,22 @@
       "val_fraction": 0.1
     },
     "adversarial_training": {
-      "threat_model": "unconstrained",
-      "eps": 0.05,
-      "steps": 7,
-      "adv_weight": 0.5
+      "adv_trained": {
+        "threat_model": "unconstrained",
+        "eps": 0.05,
+        "steps": 7,
+        "adv_weight": 0.5
+      }
     },
-    "transfer": true
+    "transfer": true,
+    "paired": [
+      [
+        "unconstrained",
+        "constrained"
+      ]
+    ]
   },
-  "robustsec": "1.0.0",
+  "robustsec": "1.1.0",
   "python": "3.13.16",
   "versions": {
     "numpy": "2.5.3",
@@ -82,6 +95,30 @@
     "torch": "2.14.1+cu130",
     "scikit_learn": "1.9.1"
   },
-  "platform": "Linux-6.18.44-fc-v77-x86_64-with-glibc2.39",
-  "wall_time_s": 4320.3
+  "hardware": {
+    "platform": "Linux-6.18.44-fc-v153-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "logical_cores": 2,
+    "ram_gb": 7.8,
+    "gpu": null,
+    "torch_threads": 2
+  },
+  "unseen_categories": {},
+  "data": {
+    "name": "nsl_kdd",
+    "n_train": 125973,
+    "n_test": 22544,
+    "n_raw_features": 41,
+    "n_encoded_columns": 122,
+    "attack_share_train": 0.4654,
+    "attack_share_test": 0.5692,
+    "n_eval": 22544
+  },
+  "stage_time_s": {
+    "train_baseline": 80.7,
+    "train_adv_trained": 562.2
+  },
+  "peak_rss_mb": 1120.2,
+  "wall_time_s": 4787.6
 }

@@ -1,0 +1,38 @@
+{
+  "n": 3000,
+  "0.01": {
+    "zero_grad_share": 0.0,
+    "evasion": {
+      "PGD": 0.0287,
+      "CW-L2": 0.029
+    }
+  },
+  "0.02": {
+    "zero_grad_share": 0.0,
+    "evasion": {
+      "PGD": 0.0697,
+      "CW-L2": 0.0713
+    }
+  },
+  "0.05": {
+    "zero_grad_share": 0.0,
+    "evasion": {
+      "PGD": 0.4553,
+      "CW-L2": 0.457
+    }
+  },
+  "0.1": {
+    "zero_grad_share": 0.0017,
+    "evasion": {
+      "PGD": 0.6493,
+      "CW-L2": 0.6497
+    }
+  },
+  "0.2": {
+    "zero_grad_share": 0.8557,
+    "evasion": {
+      "PGD": 0.249,
+      "CW-L2": 0.989
+    }
+  }
+}

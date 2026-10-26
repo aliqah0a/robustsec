@@ -1,10 +1,10 @@
 cff-version: 1.2.0
 message: "If you use RobustSec, please cite it as below."
-title: "RobustSec: feasibility-aware robustness evaluation of tabular intrusion detectors"
-version: 1.0.0
-date-released: 2026-10-07
+title: "RobustSec: robustness evaluation of tabular network intrusion detectors under schema-constrained threat models"
+version: 1.1.0
+date-released: 2026-10-26
 license: MIT
-doi: 10.5281/zenodo.23216058
+doi: 10.5281/zenodo.23216057
 repository-code: "https://github.com/aliqah0a/robustsec"
 authors:
   - family-names: AlQahtani

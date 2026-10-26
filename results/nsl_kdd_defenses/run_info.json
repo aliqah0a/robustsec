@@ -1,0 +1,124 @@
+{
+  "config": {
+    "dataset": {
+      "name": "nsl_kdd",
+      "download": true
+    },
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "eval_samples": null,
+    "eps": [
+      0.05,
+      0.1,
+      0.2
+    ],
+    "threat_models": {
+      "constrained": {
+        "mutable": [
+          "duration",
+          "src_bytes",
+          "dst_bytes",
+          "count",
+          "srv_count"
+        ],
+        "directions": {
+          "duration": 1,
+          "src_bytes": 1,
+          "dst_bytes": 1,
+          "count": 1,
+          "srv_count": 1
+        },
+        "repair": true,
+        "budget": "strict"
+      },
+      "unconstrained": {
+        "mutable": null,
+        "repair": false
+      }
+    },
+    "attacks": {
+      "pgd": {
+        "steps": 50,
+        "restarts": 2
+      },
+      "greedy": {
+        "rounds": 10,
+        "grid": 4
+      }
+    },
+    "train": {
+      "hidden": [
+        128,
+        64
+      ],
+      "epochs": 15,
+      "lr": 0.001,
+      "batch_size": 256,
+      "val_fraction": 0.1
+    },
+    "adversarial_training": {
+      "adv_unconstrained": {
+        "threat_model": "unconstrained",
+        "eps": 0.05,
+        "steps": 7,
+        "adv_weight": 0.5
+      },
+      "adv_constrained_relaxed": {
+        "threat_model": "constrained",
+        "eps": 0.1,
+        "steps": 7,
+        "adv_weight": 0.5,
+        "repair": false
+      },
+      "adv_constrained_repaired": {
+        "threat_model": "constrained",
+        "eps": 0.1,
+        "steps": 7,
+        "adv_weight": 0.5,
+        "repair": true
+      }
+    },
+    "transfer": true
+  },
+  "robustsec": "1.1.0",
+  "python": "3.13.16",
+  "versions": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "torch": "2.14.1+cu130",
+    "scikit_learn": "1.9.1"
+  },
+  "hardware": {
+    "platform": "Linux-6.18.44-fc-v153-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "logical_cores": 2,
+    "ram_gb": 7.8,
+    "gpu": null,
+    "torch_threads": 2
+  },
+  "unseen_categories": {},
+  "data": {
+    "name": "nsl_kdd",
+    "n_train": 125973,
+    "n_test": 22544,
+    "n_raw_features": 41,
+    "n_encoded_columns": 122,
+    "attack_share_train": 0.4654,
+    "attack_share_test": 0.5692,
+    "n_eval": 22544
+  },
+  "stage_time_s": {
+    "train_baseline": 75.8,
+    "train_adv_unconstrained": 462.6,
+    "train_adv_constrained_relaxed": 460.1,
+    "train_adv_constrained_repaired": 631.2
+  },
+  "peak_rss_mb": 1109.4,
+  "wall_time_s": 4108.2
+}

@@ -13,21 +13,40 @@ and categories from training data only. `transform` returns a float32 matrix in
 
 **Threat model.** A `ThreatModel` holds a mask of mutable encoded columns, a
 direction per column, box bounds, and an optional repair function. Attacks call
-`project` after each step and `finalize` once at the end. `finalize` applies
+`project` after each step and score the repaired iterate (`finalize`), so
+success always refers to a valid record. `finalize` applies
 `TabularEncoder.repair`, so every returned input decodes to a valid record.
 
 **Budget.** `eps` bounds the L-infinity change in the encoded space. Because
 numeric features are scaled to [0, 1], `eps=0.1` means one tenth of the
-(log-)range observed in training data.
+(log-)range observed in training data. For a log-scaled feature it bounds the
+ratio `(1 + x') / (1 + x)` by `exp(eps * span)`.
+
+**Budget after repair.** `ThreatModel.from_encoder(enc, schema, budget="strict")`
+(default) rounds integer features to the nearest value inside the eps-ball,
+so every candidate keeps the nominal budget. Binary and categorical changes
+cost 1 in encoded space and therefore need `eps >= 1`. `budget="nominal"`
+rounds to the nearest integer and may exceed `eps`; the reports then give
+`budget_violation_rate`, `budget_excess_mean` and `budget_excess_max`.
+
+**Relations.** A `Relation(name, inputs, outputs, fn)` recomputes derived
+features after repair. `fn(adv, orig)` gets dicts of raw arrays and returns
+new raw values for `outputs`. Pass relations to `with_threat_model(...,
+relations=[...])` or list their names under `"relations"` in a configuration.
+
+**Unseen categories.** `TabularEncoder(schema, handle_unknown="ignore")`
+encodes a value not seen in training as an all-zero group and counts it in
+`unknown_counts_`; `"error"` raises instead.
 
 ## 2. Attacks
 
 | Class | Access | Notes |
 | --- | --- | --- |
 | `FGSM(eps)` | gradients | one signed-gradient step |
-| `PGD(eps, steps, alpha, restarts)` | gradients | uniform start, keeps the best iterate |
+| `PGD(eps, steps, alpha, restarts, random_start)` | gradients | keeps the best repaired candidate over all steps and restarts |
 | `CarliniWagnerL2(eps, steps, lr, c, kappa, search_steps)` | gradients | binary search on `c`; returns the smallest successful L2 perturbation within the L-infinity bound |
 | `RandomSearch(eps, queries)` | labels only | candidates are repaired before each query |
+| `GreedySearch(eps, rounds, grid)` | class probabilities | one feature per round, grid of valid values, every query repaired |
 | `TransferAttack(base, surrogate)` | none on target | crafts on the surrogate, evaluates on the target |
 
 Gradient attacks need a `TorchClassifier`. Wrap a scikit-learn model with
@@ -45,7 +64,11 @@ use `TransferAttack`.
 - `linf`, `l2`, `l0`: mean norms over successful adversarial inputs
 - `n`, `n_correct`, `n_detected`
 
-Confidence intervals use the Wilson score interval at 95%.
+Confidence intervals use the Wilson score interval at 95%. It covers
+test-set sampling for one trained model. The standard deviation over seeds in
+`summary.csv` covers variation between trained models. `paired_difference_ci`
+(Newcombe 1998, method 10) compares two threat models on the same samples;
+list pairs under `"paired"` in a configuration to get `paired.csv`.
 
 ## 4. Configuration file
 
@@ -57,7 +80,7 @@ Confidence intervals use the Wilson score interval at 95%.
   "eps": [0.01, 0.02, 0.05, 0.1, 0.2],
   "threat_models": {
     "unconstrained": {"mutable": null, "repair": false},
-    "feasible": {"mutable": ["duration", "src_bytes"],
+    "constrained": {"mutable": ["duration", "src_bytes"],
                  "directions": {"duration": 1, "src_bytes": 1},
                  "repair": true}
   },

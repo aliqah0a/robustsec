@@ -1,0 +1,121 @@
+{
+  "config": {
+    "dataset": {
+      "name": "unsw_nb15"
+    },
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "eval_samples": 20000,
+    "eps": [
+      0.01,
+      0.02,
+      0.05,
+      0.1,
+      0.2
+    ],
+    "threat_models": {
+      "unconstrained": {
+        "mutable": null,
+        "repair": false
+      },
+      "constrained": {
+        "mutable": [
+          "dur",
+          "spkts",
+          "sbytes"
+        ],
+        "directions": {
+          "dur": 1,
+          "spkts": 1,
+          "sbytes": 1
+        },
+        "repair": true,
+        "budget": "strict"
+      }
+    },
+    "attacks": {
+      "fgsm": {},
+      "pgd": {
+        "steps": 50,
+        "restarts": 2
+      },
+      "cw": {
+        "steps": 50,
+        "search_steps": 3
+      },
+      "random": {
+        "queries": 200
+      },
+      "greedy": {
+        "rounds": 10,
+        "grid": 4
+      }
+    },
+    "train": {
+      "hidden": [
+        128,
+        64
+      ],
+      "epochs": 15,
+      "lr": 0.001,
+      "batch_size": 256,
+      "val_fraction": 0.1
+    },
+    "adversarial_training": {
+      "adv_trained": {
+        "threat_model": "unconstrained",
+        "eps": 0.05,
+        "steps": 7,
+        "adv_weight": 0.5
+      }
+    },
+    "transfer": true,
+    "paired": [
+      [
+        "unconstrained",
+        "constrained"
+      ]
+    ]
+  },
+  "robustsec": "1.1.0",
+  "python": "3.13.16",
+  "versions": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.5",
+    "torch": "2.14.1+cu130",
+    "scikit_learn": "1.9.1"
+  },
+  "hardware": {
+    "platform": "Linux-6.18.44-fc-v153-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "logical_cores": 2,
+    "ram_gb": 7.8,
+    "gpu": null,
+    "torch_threads": 2
+  },
+  "unseen_categories": {
+    "state": 5
+  },
+  "data": {
+    "name": "unsw_nb15",
+    "n_train": 175341,
+    "n_test": 82332,
+    "n_raw_features": 42,
+    "n_encoded_columns": 194,
+    "attack_share_train": 0.6806,
+    "attack_share_test": 0.5506,
+    "n_eval": 20000
+  },
+  "stage_time_s": {
+    "train_baseline": 117.0,
+    "train_adv_trained": 691.7
+  },
+  "peak_rss_mb": 1664.7,
+  "wall_time_s": 8043.1
+}

@@ -7,7 +7,6 @@ dist/
 .ipynb_checkpoints/
 .venv/
 data/
-results/*
-!results/nsl_kdd/
+logs/
 *.log
 paper/

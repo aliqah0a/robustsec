@@ -1,0 +1,83 @@
+{
+  "dataset": {
+    "name": "unsw_nb15"
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "eval_samples": 20000,
+  "eps": [
+    0.01,
+    0.02,
+    0.05,
+    0.1,
+    0.2
+  ],
+  "threat_models": {
+    "unconstrained": {
+      "mutable": null,
+      "repair": false
+    },
+    "constrained": {
+      "mutable": [
+        "dur",
+        "spkts",
+        "sbytes"
+      ],
+      "directions": {
+        "dur": 1,
+        "spkts": 1,
+        "sbytes": 1
+      },
+      "repair": true,
+      "budget": "strict"
+    }
+  },
+  "attacks": {
+    "fgsm": {},
+    "pgd": {
+      "steps": 50,
+      "restarts": 2
+    },
+    "cw": {
+      "steps": 50,
+      "search_steps": 3
+    },
+    "random": {
+      "queries": 200
+    },
+    "greedy": {
+      "rounds": 10,
+      "grid": 4
+    }
+  },
+  "train": {
+    "hidden": [
+      128,
+      64
+    ],
+    "epochs": 15,
+    "lr": 0.001,
+    "batch_size": 256,
+    "val_fraction": 0.1
+  },
+  "adversarial_training": {
+    "adv_trained": {
+      "threat_model": "unconstrained",
+      "eps": 0.05,
+      "steps": 7,
+      "adv_weight": 0.5
+    }
+  },
+  "transfer": true,
+  "paired": [
+    [
+      "unconstrained",
+      "constrained"
+    ]
+  ]
+}

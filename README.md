@@ -14,28 +14,44 @@ that are often mixed in the literature:
    must still be a valid record?
 
 The first question uses the *unconstrained* threat model. The second uses a
-*feasibility-aware* threat model, which you declare once in a feature schema.
+*schema-constrained* threat model, which you declare once in a feature schema.
 The same attacks, metrics and reports then run under both.
+
+**Scope.** A repaired record has valid types and domains, unchanged immutable
+features, the allowed directions, the nominal budget (strict mode) and the
+declared relations. RobustSec does not show that a packet sequence exists that
+produces the record. Results are comparisons between feature-space threat
+models.
 
 ## Features
 
 - **Feature schema.** Each feature has a type (continuous, integer, binary,
   categorical), a mutability flag and an allowed direction of change.
+  Optional `Relation` objects recompute derived features (for example,
+  `rs.NSL_KDD_DILUTION` rescales the NSL-KDD error rates when `count` grows).
 - **Reversible encoder.** Optional `log1p`, min-max scaling fitted on training
   data, and one-hot encoding. `TabularEncoder.repair` maps a perturbed input
   back to a valid raw record: it restores immutable features, rounds integer
-  and binary features, keeps one category active, and enforces the direction.
-- **Attacks.** FGSM, PGD (random start, restarts, best iterate), Carlini-Wagner
-  L2 bounded in L-infinity, label-only random search, and transfer from a
-  surrogate model.
-- **Defense.** PGD adversarial training with a mixed clean/adversarial loss.
+  and binary features, keeps one category active, enforces the direction and
+  applies the relations. With `budget="strict"` (default) the result stays
+  inside the eps-ball; `budget="nominal"` reproduces the v1.0 rounding.
+  Unseen categories become an all-zero group (`handle_unknown="ignore"`) or
+  raise an error (`handle_unknown="error"`).
+- **Attacks.** FGSM, PGD (random start, restarts, best repaired candidate over
+  all steps), Carlini-Wagner L2 bounded in L-infinity with success checked
+  after repair, label-only random search, score-based greedy search over
+  repaired records, and transfer from a surrogate model.
+- **Defense.** PGD adversarial training with a mixed clean/adversarial loss,
+  on repaired examples (`repair=True`, default) or on the continuous
+  relaxation (`repair=False`).
 - **Metrics.** Clean and robust accuracy, attack success rate (ASR) on
   correctly classified inputs, evasion rate on detected attacks, adversarial
-  recall and F1, L-infinity/L2/L0 norms of successful perturbations, and Wilson
-  95% confidence intervals.
+  recall, F1 and balanced accuracy, benign flip rate, L-infinity/L2/L0 norms
+  of successful perturbations, budget checks after repair, Wilson 95%
+  intervals per seed, and paired intervals between threat models.
 - **Reproducible runs.** A JSON configuration fixes data, threat models,
   attacks, budgets, defenses and seeds. Each run writes per-seed results, a
-  mean ± s.d. summary, and the software versions used.
+  mean ± s.d. summary, paired comparisons, and the software and hardware used.
 
 ## Installation
 
@@ -69,7 +85,12 @@ that folder.
 
 UNSW-NB15 is not redistributed. Download the official
 `UNSW_NB15_training-set.csv` and `UNSW_NB15_testing-set.csv` from the UNSW
-Canberra Cyber Range Lab and load them with `robustsec.load_unsw_nb15`. Any
+Canberra Cyber Range Lab, place them in `~/.robustsec/data/unsw_nb15/`, and
+load them with `robustsec.load_unsw_nb15()`. The official training partition
+has 175,341 records and the testing partition 82,332. Some copies of the files
+carry swapped names; the loader detects this from the record counts, warns,
+and uses the larger file for training. It also strips the byte-order mark at
+the start of the files. Any
 other binary-labelled CSV dataset can be loaded with `robustsec.load_csv`.
 
 ## Quick start
@@ -84,10 +105,10 @@ X_tr, X_te = enc.transform(ds.X_train), enc.transform(ds.X_test)
 clf = rs.fit_classifier(X_tr, ds.y_train, seed=0)
 
 # Attacker controls five traffic volume and timing features and can only increase them.
-feasible = rs.ThreatModel.from_encoder(enc, rs.nsl_kdd_feasible_schema())
+constrained = rs.ThreatModel.from_encoder(enc, rs.nsl_kdd_feasible_schema())
 unconstrained = rs.ThreatModel.unconstrained(enc.n_features_)
 
-for name, tm in [("unconstrained", unconstrained), ("feasible", feasible)]:
+for name, tm in [("unconstrained", unconstrained), ("constrained", constrained)]:
     X_adv = rs.PGD(eps=0.1, steps=50, restarts=2, threat_model=tm).generate(clf, X_te, ds.y_test)
     r = rs.robustness_report(clf, X_te, X_adv, ds.y_test)
     print(f"{name:14s} robust acc={r['robust_accuracy']:.3f} "
@@ -122,19 +143,22 @@ Each run writes:
 
 | File | Content |
 | --- | --- |
-| `results.csv` | one row per seed, model, threat model, attack and budget |
+| `results.csv` | one row per seed, model, threat model, attack and budget, with Wilson bounds, budget checks and attack time |
 | `summary.csv` | mean and standard deviation over seeds |
-| `clean.csv` | clean test metrics and validation accuracy per seed |
-| `run_info.json` | configuration, package versions, platform and wall time |
+| `paired.csv` | paired differences between threat models with Newcombe intervals |
+| `clean.csv` | clean metrics, confusion counts and validation accuracy per seed |
+| `run_info.json` | configuration, versions, CPU, cores, RAM, GPU, peak memory, stage times, dataset sizes |
 
 ## Reproducing the paper
 
 ```bash
-bash scripts/reproduce_paper.sh
+bash scripts/run_revision.sh          # all four studies, figures and paper numbers
 ```
 
-The script runs the tests, the full NSL-KDD study and the figure script. The
-reference outputs used in the paper are in `results/nsl_kdd/`.
+The script runs the tests, the main NSL-KDD study, the ablation, the defense
+comparison and (if the files are present) the UNSW-NB15 study. It then draws
+the figures and writes `paper/results_macros.tex`, which fills every number in
+the manuscript. The reference outputs used in the paper are in `results/`.
 
 ## Metric definitions
 
@@ -144,6 +168,10 @@ inputs it detects.
 - **Robust accuracy**: accuracy on adversarial inputs over all test inputs.
 - **ASR**: share of *C* whose prediction changes after the attack.
 - **Evasion rate**: share of *D* predicted benign after the attack.
+- **Benign flip rate**: share of correctly classified benign inputs predicted
+  as attacks after the attack.
+- **Budget violation rate**: share of perturbed inputs whose realized
+  L-infinity distance on the attacker-controlled columns exceeds eps.
 - **L-infinity, L2, L0**: perturbation size in the encoded space, averaged over
   successful adversarial inputs only.
 

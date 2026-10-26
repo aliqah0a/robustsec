@@ -25,7 +25,12 @@ class Classifier:
 
 
 class SklearnClassifier(Classifier):
-    """Label-only wrapper around any object with ``predict``."""
+    """Black-box wrapper around any object with ``predict``.
+
+    Any model object works, including TensorFlow, JAX or ONNX models behind
+    a small adapter. Label-only attacks need ``predict``; the score-based
+    :class:`~robustsec.attacks.GreedySearch` also needs ``predict_proba``.
+    """
 
     has_gradients = False
 
@@ -36,6 +41,11 @@ class SklearnClassifier(Classifier):
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         return np.asarray(self.model.predict(np.asarray(X)))
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        if not hasattr(self.model, "predict_proba"):
+            raise TypeError("model does not implement predict_proba()")
+        return np.asarray(self.model.predict_proba(np.asarray(X)))
 
 
 class TorchClassifier(Classifier):

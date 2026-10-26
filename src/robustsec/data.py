@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import os
 import urllib.request
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
@@ -17,7 +18,7 @@ from typing import Iterable, Optional, Sequence
 import numpy as np
 import pandas as pd
 
-from .schema import FeatureSchema, FeatureSpec
+from .schema import FeatureSchema, FeatureSpec, Relation
 
 
 @dataclass
@@ -71,7 +72,41 @@ _NSL_LOG = ["duration", "src_bytes", "dst_bytes", "hot", "num_compromised",
 #: Features an external attacker can plausibly raise without breaking the
 #: attack: connection length (delays), payload volume (padding) and the
 #: number of connections in the 2-second window (dummy connections).
+#: ``dst_bytes`` is the server's response volume; the attacker controls it
+#: only indirectly (for example by requesting larger resources), so the
+#: ablation configuration also runs a variant without it.
 NSL_KDD_FEASIBLE_MUTABLE = ["duration", "src_bytes", "dst_bytes", "count", "srv_count"]
+NSL_KDD_FEASIBLE_DIRECTIONS = {n: +1 for n in NSL_KDD_FEASIBLE_MUTABLE}
+
+
+def _nsl_kdd_dilution(adv, org):
+    """Error rates after the attacker adds error-free connections.
+
+    ``serror_rate`` and ``rerror_rate`` are fractions of the ``count``
+    connections to the same host in the last two seconds;
+    ``srv_serror_rate`` and ``srv_rerror_rate`` are fractions of the
+    ``srv_count`` connections to the same service. Extra connections that
+    raise ``count`` or ``srv_count`` without SYN or REJ errors keep the
+    number of errored connections fixed, so each rate scales by
+    ``old_count / new_count``. Values are rounded to two decimals, as in
+    the dataset.
+    """
+    out = {}
+    for rate, cnt in (("serror_rate", "count"), ("rerror_rate", "count"),
+                      ("srv_serror_rate", "srv_count"), ("srv_rerror_rate", "srv_count")):
+        new = np.maximum(adv[cnt], 1.0)
+        out[rate] = np.round(org[rate] * np.maximum(org[cnt], 1.0) / new, 2)
+    return out
+
+
+NSL_KDD_DILUTION = Relation(
+    "nsl_kdd_dilution",
+    inputs=("count", "srv_count"),
+    outputs=("serror_rate", "rerror_rate", "srv_serror_rate", "srv_rerror_rate"),
+    fn=_nsl_kdd_dilution)
+
+#: Named relations that a configuration file can refer to.
+RELATIONS = {"nsl_kdd_dilution": NSL_KDD_DILUTION}
 
 
 def nsl_kdd_schema() -> FeatureSchema:
@@ -90,11 +125,15 @@ def nsl_kdd_schema() -> FeatureSchema:
     return FeatureSchema(specs)
 
 
-def nsl_kdd_feasible_schema() -> FeatureSchema:
-    """Restricted threat model: only volume/timing features, increase only."""
+def nsl_kdd_feasible_schema(dilution: bool = False) -> FeatureSchema:
+    """Constrained threat model: volume/timing features, increase only.
+
+    ``dilution=True`` adds :data:`NSL_KDD_DILUTION`, which updates the four
+    error-rate features when ``count`` or ``srv_count`` grow.
+    """
     return nsl_kdd_schema().with_threat_model(
-        mutable=NSL_KDD_FEASIBLE_MUTABLE,
-        directions={n: +1 for n in NSL_KDD_FEASIBLE_MUTABLE})
+        mutable=NSL_KDD_FEASIBLE_MUTABLE, directions=NSL_KDD_FEASIBLE_DIRECTIONS,
+        relations=(NSL_KDD_DILUTION,) if dilution else ())
 
 
 def _sha256(path: Path) -> str:
@@ -145,28 +184,60 @@ def load_nsl_kdd(data_dir: Optional[os.PathLike] = None, download: bool = False,
 
 
 # ------------------------------------------------------------------- UNSW-NB15
-def load_unsw_nb15(train_csv: os.PathLike, test_csv: os.PathLike) -> TabularDataset:
+UNSW_NB15_FILES = ("UNSW_NB15_training-set.csv", "UNSW_NB15_testing-set.csv")
+#: official partition sizes are 175,341 (training) and 82,332 (testing)
+UNSW_NB15_SWAPPED_SIZES = (82_332, 175_341)
+
+#: Source-side volume and timing features of UNSW-NB15 that a sender can
+#: raise: flow duration, packets sent and bytes sent (increase only).
+UNSW_NB15_FEASIBLE_MUTABLE = ["dur", "spkts", "sbytes"]
+
+
+def load_unsw_nb15(train_csv: Optional[os.PathLike] = None,
+                   test_csv: Optional[os.PathLike] = None) -> TabularDataset:
     """Load the official UNSW-NB15 training and testing partitions.
 
     Download ``UNSW_NB15_training-set.csv`` and ``UNSW_NB15_testing-set.csv``
-    from the UNSW Canberra dataset page and pass their paths.
+    from the UNSW Canberra dataset page. Pass their paths, or place them in
+    ``$ROBUSTSEC_DATA/unsw_nb15``. The schema is inferred: ``proto``,
+    ``service`` and ``state`` are categorical, and non-negative numeric
+    features with a maximum above 10 (durations, counts, bytes, loads) get a
+    ``log1p`` transform.
     """
-    train = pd.read_csv(train_csv)
-    test = pd.read_csv(test_csv)
+    d = default_data_dir() / "unsw_nb15"
+    train_csv = Path(train_csv) if train_csv else d / UNSW_NB15_FILES[0]
+    test_csv = Path(test_csv) if test_csv else d / UNSW_NB15_FILES[1]
+    for p in (train_csv, test_csv):
+        if not Path(p).exists():
+            raise FileNotFoundError(f"{p} not found. Download the official UNSW-NB15 "
+                                    "partitions and pass their paths.")
+    # the distributed CSV files start with a UTF-8 byte-order mark
+    train = pd.read_csv(train_csv, encoding="utf-8-sig")
+    test = pd.read_csv(test_csv, encoding="utf-8-sig")
+    if (len(train), len(test)) == UNSW_NB15_SWAPPED_SIZES:
+        # Some copies of the official files carry swapped names: the file
+        # called "training-set" holds the 82,332-record testing partition.
+        warnings.warn("UNSW-NB15 file names are swapped (82,332-record file named "
+                      "'training'); using the 175,341-record file for training.")
+        train, test = test, train
     drop = [c for c in ("id", "label", "attack_cat") if c in train.columns]
     return load_csv_frames("unsw_nb15", train, test,
                            y_train=train["label"].to_numpy(dtype=np.int64),
                            y_test=test["label"].to_numpy(dtype=np.int64),
-                           exclude=drop, categorical=("proto", "service", "state"))
+                           exclude=drop, categorical=("proto", "service", "state"),
+                           log_heavy_tailed=True, log_threshold=10.0)
 
 
 # --------------------------------------------------------------------- generic
 def load_csv_frames(name: str, train: pd.DataFrame, test: pd.DataFrame,
                     y_train: np.ndarray, y_test: np.ndarray,
                     exclude: Iterable[str] = (),
-                    categorical: Sequence[str] = ()) -> TabularDataset:
+                    categorical: Sequence[str] = (),
+                    log_heavy_tailed: bool = False,
+                    log_threshold: float = 100.0) -> TabularDataset:
     """Wrap any pair of DataFrames as a :class:`TabularDataset`."""
-    schema = FeatureSchema.infer(train, categorical=categorical, exclude=exclude)
+    schema = FeatureSchema.infer(train, categorical=categorical, exclude=exclude,
+                                 log_heavy_tailed=log_heavy_tailed, log_threshold=log_threshold)
     cols = schema.names
     return TabularDataset(name, train[cols].reset_index(drop=True), np.asarray(y_train),
                           test[cols].reset_index(drop=True), np.asarray(y_test), schema)

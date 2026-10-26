@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "robustsec"
-version = "1.0.0"
+version = "1.1.0"
 description = "Robustness evaluation of tabular intrusion detectors under feasibility-aware threat models"
 readme = "README.md"
 license = {file = "LICENSE.txt"}

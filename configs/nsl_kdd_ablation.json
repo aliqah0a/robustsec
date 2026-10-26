@@ -1,0 +1,173 @@
+{
+  "dataset": {
+    "name": "nsl_kdd",
+    "download": true
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "eval_samples": null,
+  "eps": [
+    0.05,
+    0.1,
+    0.2
+  ],
+  "threat_models": {
+    "A0_unconstrained": {
+      "mutable": null,
+      "repair": false
+    },
+    "A1_types_only": {
+      "mutable": null,
+      "repair": true,
+      "budget": "strict"
+    },
+    "A2_mask": {
+      "mutable": [
+        "duration",
+        "src_bytes",
+        "dst_bytes",
+        "count",
+        "srv_count"
+      ],
+      "repair": false
+    },
+    "A3_mask_direction": {
+      "mutable": [
+        "duration",
+        "src_bytes",
+        "dst_bytes",
+        "count",
+        "srv_count"
+      ],
+      "directions": {
+        "duration": 1,
+        "src_bytes": 1,
+        "dst_bytes": 1,
+        "count": 1,
+        "srv_count": 1
+      },
+      "repair": false
+    },
+    "A4_mask_direction_repair_nominal": {
+      "mutable": [
+        "duration",
+        "src_bytes",
+        "dst_bytes",
+        "count",
+        "srv_count"
+      ],
+      "directions": {
+        "duration": 1,
+        "src_bytes": 1,
+        "dst_bytes": 1,
+        "count": 1,
+        "srv_count": 1
+      },
+      "repair": true,
+      "budget": "nominal"
+    },
+    "A5_constrained": {
+      "mutable": [
+        "duration",
+        "src_bytes",
+        "dst_bytes",
+        "count",
+        "srv_count"
+      ],
+      "directions": {
+        "duration": 1,
+        "src_bytes": 1,
+        "dst_bytes": 1,
+        "count": 1,
+        "srv_count": 1
+      },
+      "repair": true,
+      "budget": "strict"
+    },
+    "A6_constrained_no_dst_bytes": {
+      "mutable": [
+        "duration",
+        "src_bytes",
+        "count",
+        "srv_count"
+      ],
+      "directions": {
+        "duration": 1,
+        "src_bytes": 1,
+        "count": 1,
+        "srv_count": 1
+      },
+      "repair": true,
+      "budget": "strict"
+    },
+    "A7_constrained_dilution": {
+      "mutable": [
+        "duration",
+        "src_bytes",
+        "dst_bytes",
+        "count",
+        "srv_count"
+      ],
+      "directions": {
+        "duration": 1,
+        "src_bytes": 1,
+        "dst_bytes": 1,
+        "count": 1,
+        "srv_count": 1
+      },
+      "repair": true,
+      "budget": "strict",
+      "relations": [
+        "nsl_kdd_dilution"
+      ]
+    }
+  },
+  "attacks": {
+    "pgd": {
+      "steps": 50,
+      "restarts": 2
+    },
+    "cw": {
+      "steps": 50,
+      "search_steps": 3
+    },
+    "greedy": {
+      "rounds": 10,
+      "grid": 4
+    }
+  },
+  "train": {
+    "hidden": [
+      128,
+      64
+    ],
+    "epochs": 15,
+    "lr": 0.001,
+    "batch_size": 256,
+    "val_fraction": 0.1
+  },
+  "transfer": false,
+  "paired": [
+    [
+      "A3_mask_direction",
+      "A5_constrained"
+    ],
+    [
+      "A4_mask_direction_repair_nominal",
+      "A5_constrained"
+    ],
+    [
+      "A5_constrained",
+      "A6_constrained_no_dst_bytes"
+    ],
+    [
+      "A5_constrained",
+      "A7_constrained_dilution"
+    ]
+  ]
+}

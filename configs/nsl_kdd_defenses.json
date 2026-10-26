@@ -1,0 +1,86 @@
+{
+  "dataset": {
+    "name": "nsl_kdd",
+    "download": true
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "eval_samples": null,
+  "eps": [
+    0.05,
+    0.1,
+    0.2
+  ],
+  "threat_models": {
+    "constrained": {
+      "mutable": [
+        "duration",
+        "src_bytes",
+        "dst_bytes",
+        "count",
+        "srv_count"
+      ],
+      "directions": {
+        "duration": 1,
+        "src_bytes": 1,
+        "dst_bytes": 1,
+        "count": 1,
+        "srv_count": 1
+      },
+      "repair": true,
+      "budget": "strict"
+    },
+    "unconstrained": {
+      "mutable": null,
+      "repair": false
+    }
+  },
+  "attacks": {
+    "pgd": {
+      "steps": 50,
+      "restarts": 2
+    },
+    "greedy": {
+      "rounds": 10,
+      "grid": 4
+    }
+  },
+  "train": {
+    "hidden": [
+      128,
+      64
+    ],
+    "epochs": 15,
+    "lr": 0.001,
+    "batch_size": 256,
+    "val_fraction": 0.1
+  },
+  "adversarial_training": {
+    "adv_unconstrained": {
+      "threat_model": "unconstrained",
+      "eps": 0.05,
+      "steps": 7,
+      "adv_weight": 0.5
+    },
+    "adv_constrained_relaxed": {
+      "threat_model": "constrained",
+      "eps": 0.1,
+      "steps": 7,
+      "adv_weight": 0.5,
+      "repair": false
+    },
+    "adv_constrained_repaired": {
+      "threat_model": "constrained",
+      "eps": 0.1,
+      "steps": 7,
+      "adv_weight": 0.5,
+      "repair": true
+    }
+  },
+  "transfer": true
+}
